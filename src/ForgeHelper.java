@@ -3,17 +3,24 @@ import java.awt.HeadlessException;
 import java.awt.MouseInfo;
 import java.awt.Robot;
 import java.awt.event.InputEvent;
+import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
+
+import net.sourceforge.tess4j.TesseractException;
 
 public class ForgeHelper {
 
 	public static int lastMousePositionX = 0;
 	public static int lastMousePositionY = 0;
+ 
 	
 	public static void getMouseCordinates(int time) {
 		for(int i=0;i<time;i++){
@@ -55,7 +62,69 @@ public class ForgeHelper {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
+	}
+	
+	public static void mouseLbHold() throws InterruptedException {
+		Robot bot;
+		try {
+			bot = new Robot();
+//			Thread.sleep(200);
+			bot.mousePress(InputEvent.BUTTON1_MASK);
+		    bot.mouseRelease(InputEvent.BUTTON1_MASK);
+		} catch (AWTException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public static void mouseLbRelease() throws InterruptedException {
+		Robot bot;
+		try {
+			bot = new Robot();
+//			Thread.sleep(200);
+		    bot.mouseRelease(InputEvent.BUTTON1_MASK);
+		} catch (AWTException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public static void moveMouseWhileLbPressed(int fromX, int fromY, int toX, int toY) throws AWTException, InterruptedException {
+		Robot bot = new Robot();
+		for(int i=0;fromX+i<toX;i++) {
+			bot.mouseMove(fromX+i, fromY);
+		}
+		for(int i=0;fromY+i<toY;i++) {
+			bot.mouseMove(toX, fromY+i);
+		}
+		updateLastMousePosition(toX, toY);
+		Thread.sleep(200);
+	}
+	
+	public static void moveMousefast(int fromX, int fromY, int toX, int toY) throws AWTException, InterruptedException {
+		int x=0;
+		int y=0;
+		Robot bot = new Robot();
+		while(fromX!=toX && fromY!=toY) {
+			if(fromX<toX) {
+				x++;
+			}else if (fromX>toX) {
+				x--;
+			}
+			if(fromY<toY) {
+				y++;
+			}else if (fromY>toY) {
+				y--;
+			}	
+		}
+		for(int i=0;fromX+i<toX;i++) {
+			bot.mouseMove(fromX+i, fromY);
+		}
+		for(int i=0;fromY+i<toY;i++) {
+			bot.mouseMove(toX, fromY+i);
+		}
+		updateLastMousePosition(toX, toY);
+		Thread.sleep(200);
 	}
 	
 	public static void moveMouse(int fromX, int fromY, int toX, int toY) throws AWTException, InterruptedException {
@@ -78,48 +147,96 @@ public class ForgeHelper {
 //		
 //	}
 	
-	public static boolean forgeSameItem() throws HeadlessException, IOException, AWTException, NoSuchAlgorithmException, InterruptedException {
+	//Depricated . Rezepte werden jetzt in der DB gepflegt.
+//	public static void loadRecipesFromFile() throws IOException {
+//		FileReader fr = new FileReader(Settings.recipesPath+"\\recipes.txt");
+//	    BufferedReader br = new BufferedReader(fr);
+//	    
+//	    String line = br.readLine();
+//	    while(line!=null) {
+//	    	
+//	    }
+//	}
+	
+	public static boolean forgeSameItem(String itemHash) throws HeadlessException, IOException, AWTException, NoSuchAlgorithmException, InterruptedException, TesseractException {
 		//Muss dann übergeben werden aber ich setzte den jetzt einfach mal statisch.
 		//Item BCCEC657F8E06AF993E111C26CFEED3C shall be forged
 		//Gets the Window Inventory Windows for the MysticForge
-		String choosenItem="BCCEC657F8E06AF993E111C26CFEED3C";
-		OCR.getMysticForgeInput();
+//		itemHash="BCCEC657F8E06AF993E111C26CFEED3C";
+		OCR.initForge();
 		boolean moreForgeable = false;
-		//55 items
-		ArrayList<Integer> itemList = new ArrayList<>();
-		int foundItems=0;
-		int item=0;
-		while(item<40) {
-			OCR.getMysticForgeItem(item);
-			if(OCR.getChecksumFromPicture(item).equals(choosenItem)){
-//				System.out.println("Item "+item+" is the choosen one!");
-				itemList.add(item);
-				foundItems++;
-			}
-			item++;		
+		if(checkRecipePossible(itemHash, itemHash, itemHash, itemHash)==true) {
+			forgeItems(itemHash, itemHash, itemHash, itemHash);
 		}
-		
-		System.out.println(itemList.size()+" Items zum klicken entdeckt");
-		
-		if(itemList.size()>3) {
-			for(int i=0;i<4;i++) {
-				moveToForgeItem(itemList.get(i));
-//				Thread.sleep(500);
-				mouseDoubleClick();
-			}
-		}else {
-			System.out.println("Not enough Items to forge");
-		}
-		moveToForgeButton();
-		mouseDoubleClick();
-		
-		if(itemList.size()>3)
-			moreForgeable=true;
-		System.out.println("Weiter: "+moreForgeable);
+		OCR.initForge();
+		moreForgeable=checkRecipePossible(itemHash, itemHash, itemHash, itemHash);
+		System.out.println("Weitere Forges:"+moreForgeable);
 		Thread.sleep(3000);
 		return moreForgeable;
 	}
 	
+	//Takes 4 item hashes looks for them at the forge menu and forge it.
+	public static boolean forgeItems(String item1, String item2, String item3, String item4) throws HeadlessException, IOException, AWTException, NumberFormatException, InterruptedException, NoSuchAlgorithmException, TesseractException {
+		Boolean ongoing = false;
+		OCR.getMysticForgeWindow();
+		for(int i=0;i<55;i++) {
+			OCR.getMysticForgeItem(i);
+		}
+		OCR.createHashList();
+		if(checkRecipePossible(item1, item2, item3, item4)==true) {
+			String item1Pos=getItemPositionFromHash(item1);
+			String item2Pos=getItemPositionFromHash(item2);
+			String item3Pos=getItemPositionFromHash(item3);
+			String item4Pos=getItemPositionFromHash(item4);
+			moveToForgeItem(Integer.parseInt(item1Pos));
+			mouseDoubleClick();
+			moveToForgeItem(Integer.parseInt(item2Pos));
+			mouseDoubleClick();
+			moveToForgeItem(Integer.parseInt(item3Pos));
+			mouseDoubleClick();
+			moveToForgeItem(Integer.parseInt(item4Pos));
+			mouseDoubleClick();
+			moveToForgeButton();
+			mouseClick();
+		}else {
+			System.out.println("No items found!");
+//			System.out.println("itemPos1:"+item1Pos+"\nitemPos2:"+item2Pos+"\nitemPos3:"+item3Pos+"\nitemPos4:"+item4Pos);
+			
+		}
+		ongoing = checkRecipePossible(item1, item2, item3, item4);
+		return ongoing;
+		
+	}
+	
+	public static boolean checkRecipePossible (String item1, String item2, String item3, String item4) {
+		Boolean possible = false;
+		String item1Pos=getItemPositionFromHash(item1);
+		String item2Pos=getItemPositionFromHash(item2);
+		String item3Pos=getItemPositionFromHash(item3);
+		String item4Pos=getItemPositionFromHash(item4);
+		if(item1Pos==null || item2Pos==null || item3Pos==null || item4Pos==null) {
+			possible=false;
+		}else {
+			possible=true;
+		}
+		return possible;
+	}
+	
+	public static String getItemPositionFromHash(String hash) {
+		String itemPosition=null;
+		int counter=0;
+		boolean found = false;
+		while(found!=true && counter<OCR.itemHashList.size()) {
+			if(hash.equals(OCR.itemHashList.get(counter))) {
+				itemPosition=String.valueOf(counter);
+				found=true;
+//				System.out.println("Found item:"+hash+" on position:"+counter);
+			}
+			counter++;
+		}
+		return itemPosition;
+		
+	}
 	public static void debugMouseMoveWithBot(Robot bot,int x, int y) throws InterruptedException, AWTException {
 		bot.mouseMove(0, 0);
 		Thread.sleep(500);
